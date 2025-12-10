@@ -3,33 +3,41 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 
 const app = express();
+
+// 1. MIDDLEWARE
 app.use(express.json());
 
-// Allow CORS for any origin (Standard for public deployment tests)
+// CORS CONFIGURATION (Crucial for Vercel + Render)
+// We use origin: '*' to allow Vercel to connect without issues.
+// We REMOVED 'credentials: true' to prevent browser blocking.
 app.use(cors({
-  origin: '*', 
-  // credentials: true 
+  origin: '*'
 }));
 
-// Mock Database
+// 2. MOCK DATABASE
 const users = [{ id: 1, email: 'user@test.com', password: 'password123', name: 'Test User' }];
 
-// Keys
+// 3. SECRETS (In a real app, use .env files)
 const ACCESS_SECRET = 'access_secret_123';
 const REFRESH_SECRET = 'refresh_secret_123';
 
-// Generate Tokens
-const generateAccessToken = (user) => jwt.sign({ id: user.id, name: user.name }, ACCESS_SECRET, { expiresIn: '15s' }); // Short-lived for testing
-const generateRefreshToken = (user) => jwt.sign({ id: user.id, name: user.name }, REFRESH_SECRET, { expiresIn: '7d' });
+// 4. HELPER FUNCTIONS
+const generateAccessToken = (user) => {
+  return jwt.sign({ id: user.id, name: user.name }, ACCESS_SECRET, { expiresIn: '15s' });
+};
+
+const generateRefreshToken = (user) => {
+  return jwt.sign({ id: user.id, name: user.name }, REFRESH_SECRET, { expiresIn: '7d' });
+};
 
 // --- ROUTES ---
 
-// 0. HEALTH CHECK (Fixes "Cannot GET /" on Render)
+// ROOT ROUTE (Fixes "Cannot GET /" on Render)
 app.get('/', (req, res) => {
-  res.send("API is running... Access the frontend to log in.");
+  res.send("API is running... Use the Client App to login.");
 });
 
-// 1. LOGIN ROUTE
+// LOGIN ROUTE
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
   const user = users.find((u) => u.email === email && u.password === password);
@@ -39,22 +47,20 @@ app.post('/login', (req, res) => {
   const accessToken = generateAccessToken(user);
   const refreshToken = generateRefreshToken(user);
 
-  // Note: In a real DB app, we would save refreshToken here. 
-  // For this mock server, we send it stateless to avoid "Server Restart" bugs.
-  
   res.json({ accessToken, refreshToken });
 });
 
-// 2. REFRESH ROUTE (Stateless Fix)
+// REFRESH ROUTE (STATELESS FIX)
 app.post('/refresh', (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(401).json("You are not authenticated");
 
-  // Verify the token's signature directly
+  // FIX: We verify the signature ONLY. We do NOT check a server-side array.
+  // This ensures that even if Render restarts, valid tokens are still accepted.
   jwt.verify(token, REFRESH_SECRET, (err, user) => {
     if (err) return res.status(403).json("Token is not valid");
     
-    // If valid, issue a new set of tokens
+    // Token is valid! Issue new ones.
     const newAccessToken = generateAccessToken(user);
     const newRefreshToken = generateRefreshToken(user);
     
@@ -62,14 +68,13 @@ app.post('/refresh', (req, res) => {
   });
 });
 
-// 3. LOGOUT ROUTE
+// LOGOUT ROUTE
 app.post('/logout', (req, res) => {
-  // In a stateless JWT setup, logout is handled primarily by the client 
-  // deleting the token. The server just confirms the request.
+  // Stateless logout is handled by the client deleting the token.
   res.json("Logged out successfully");
 });
 
-// 4. PROTECTED DATA ROUTE
+// PROTECTED DATA ROUTE
 app.get('/me', (req, res) => {
   const authHeader = req.headers.authorization;
   if (authHeader) {
@@ -83,4 +88,5 @@ app.get('/me', (req, res) => {
   }
 });
 
+// START SERVER
 app.listen(5000, () => console.log("Server running on port 5000"));
