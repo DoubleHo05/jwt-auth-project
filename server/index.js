@@ -4,8 +4,8 @@ const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(express.json());
-// Allow CORS for our React app
-// Allow any origin to connect (simplest for deployment)
+
+// Allow CORS for any origin (Standard for public deployment tests)
 app.use(cors({
   origin: '*', 
   credentials: true 
@@ -13,15 +13,21 @@ app.use(cors({
 
 // Mock Database
 const users = [{ id: 1, email: 'user@test.com', password: 'password123', name: 'Test User' }];
-let refreshTokens = []; // In a real app, store this in a DB
 
 // Keys
 const ACCESS_SECRET = 'access_secret_123';
 const REFRESH_SECRET = 'refresh_secret_123';
 
 // Generate Tokens
-const generateAccessToken = (user) => jwt.sign({ id: user.id, name: user.name }, ACCESS_SECRET, { expiresIn: '15s' }); // Expires in 15s for testing!
+const generateAccessToken = (user) => jwt.sign({ id: user.id, name: user.name }, ACCESS_SECRET, { expiresIn: '15s' }); // Short-lived for testing
 const generateRefreshToken = (user) => jwt.sign({ id: user.id, name: user.name }, REFRESH_SECRET, { expiresIn: '7d' });
+
+// --- ROUTES ---
+
+// 0. HEALTH CHECK (Fixes "Cannot GET /" on Render)
+app.get('/', (req, res) => {
+  res.send("API is running... Access the frontend to log in.");
+});
 
 // 1. LOGIN ROUTE
 app.post('/login', (req, res) => {
@@ -32,24 +38,25 @@ app.post('/login', (req, res) => {
 
   const accessToken = generateAccessToken(user);
   const refreshToken = generateRefreshToken(user);
-  refreshTokens.push(refreshToken);
 
+  // Note: In a real DB app, we would save refreshToken here. 
+  // For this mock server, we send it stateless to avoid "Server Restart" bugs.
+  
   res.json({ accessToken, refreshToken });
 });
 
-// 2. REFRESH ROUTE
+// 2. REFRESH ROUTE (Stateless Fix)
 app.post('/refresh', (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(401).json("You are not authenticated");
-  if (!refreshTokens.includes(token)) return res.status(403).json("Refresh token is not valid");
 
+  // Verify the token's signature directly
   jwt.verify(token, REFRESH_SECRET, (err, user) => {
-    if (err) console.log(err);
-    refreshTokens = refreshTokens.filter((t) => t !== token); // Rotate token (optional security step)
+    if (err) return res.status(403).json("Token is not valid");
     
+    // If valid, issue a new set of tokens
     const newAccessToken = generateAccessToken(user);
     const newRefreshToken = generateRefreshToken(user);
-    refreshTokens.push(newRefreshToken);
     
     res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
   });
@@ -57,8 +64,8 @@ app.post('/refresh', (req, res) => {
 
 // 3. LOGOUT ROUTE
 app.post('/logout', (req, res) => {
-  const { token } = req.body;
-  refreshTokens = refreshTokens.filter((t) => t !== token);
+  // In a stateless JWT setup, logout is handled primarily by the client 
+  // deleting the token. The server just confirms the request.
   res.json("Logged out successfully");
 });
 
