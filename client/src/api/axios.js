@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:5000'; // Make sure this matches your server port
+const BASE_URL = 'https://jwt-api-qi2a.onrender.com'; // Make sure this matches your server port
 
 const api = axios.create({
   baseURL: BASE_URL,
