@@ -5,7 +5,11 @@ const jwt = require('jsonwebtoken');
 const app = express();
 app.use(express.json());
 // Allow CORS for our React app
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+// Allow any origin to connect (simplest for deployment)
+app.use(cors({
+  origin: '*', 
+  credentials: true 
+}));
 
 // Mock Database
 const users = [{ id: 1, email: 'user@test.com', password: 'password123', name: 'Test User' }];
