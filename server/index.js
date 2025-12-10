@@ -8,7 +8,7 @@ app.use(express.json());
 // Allow CORS for any origin (Standard for public deployment tests)
 app.use(cors({
   origin: '*', 
-  credentials: true 
+  // credentials: true 
 }));
 
 // Mock Database
